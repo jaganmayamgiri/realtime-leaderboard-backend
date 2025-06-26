@@ -1,3 +1,7 @@
+const fs = require('fs');
+const path = require('path');
+const leaderboardFile = path.join(__dirname, 'leaderboard.json');
+
 // Custom Min-Heap implementation for top N scores
 class MinHeap {
     constructor(maxSize) {
@@ -70,18 +74,44 @@ const port = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || '*',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    origin: '*',  // Allow all origins in development
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type'],
+    credentials: true
 }));
 app.use(express.json());
 
 // Initialize heap with max size of 100
 const leaderboard = new MinHeap(100);
 
+// Load leaderboard from file if it exists
+function loadLeaderboard() {
+    if (fs.existsSync(leaderboardFile)) {
+        try {
+            const data = JSON.parse(fs.readFileSync(leaderboardFile, 'utf-8'));
+            if (Array.isArray(data)) {
+                data.forEach(entry => leaderboard.insert(entry));
+            }
+        } catch (e) {
+            console.error('Failed to load leaderboard from file:', e);
+        }
+    }
+}
+
+// Save leaderboard to file
+function saveLeaderboard() {
+    try {
+        fs.writeFileSync(leaderboardFile, JSON.stringify(leaderboard.getSortedScores(), null, 2));
+    } catch (e) {
+        console.error('Failed to save leaderboard to file:', e);
+    }
+}
+
+loadLeaderboard();
+
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.error('Global error handler:', err.stack);
     res.status(500).json({ error: 'Something went wrong!' });
 });
 
@@ -91,14 +121,28 @@ app.post('/add_score', (req, res) => {
         const { name, score } = req.body;
         
         if (!name || typeof score !== 'number') {
-            return res.status(400).json({ error: 'Invalid input. Name and score are required.' });
+            return res.status(400).json({ 
+                error: 'Invalid input. Name and score are required.',
+                details: { name: !name ? 'Name is required' : null, score: typeof score !== 'number' ? 'Score must be a number' : null }
+            });
+        }
+
+        if (score < 0 || score > 100) {
+            return res.status(400).json({ error: 'Score must be between 0 and 100' });
         }
 
         leaderboard.insert({ name, score });
-        res.json({ message: 'Score added successfully', scores: leaderboard.getSortedScores() });
+        const updatedScores = leaderboard.getSortedScores();
+        saveLeaderboard();
+        console.log('Score added successfully:', { name, score, updatedScores });
+        res.json({ 
+            message: 'Score added successfully', 
+            scores: updatedScores,
+            position: updatedScores.findIndex(s => s.name === name && s.score === score) + 1
+        });
     } catch (error) {
         console.error('Error adding score:', error);
-        res.status(500).json({ error: 'Failed to add score' });
+        res.status(500).json({ error: 'Failed to add score', details: error.message });
     }
 });
 
@@ -108,6 +152,17 @@ app.get('/get_leaderboard', (req, res) => {
     } catch (error) {
         console.error('Error getting leaderboard:', error);
         res.status(500).json({ error: 'Failed to get leaderboard' });
+    }
+});
+
+app.post('/clear_leaderboard', (req, res) => {
+    try {
+        leaderboard.heap = [];
+        saveLeaderboard();
+        res.json({ message: 'Leaderboard cleared' });
+    } catch (error) {
+        console.error('Error clearing leaderboard:', error);
+        res.status(500).json({ error: 'Failed to clear leaderboard' });
     }
 });
 
