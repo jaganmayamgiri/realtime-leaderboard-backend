@@ -160,6 +160,13 @@ app.post('/clear_leaderboard', (req, res) => {
     }
 });
 
+// Automatically clear leaderboard every 10 minutes
+setInterval(() => {
+    leaderboard.heap = [];
+    saveLeaderboard();
+    console.log('Leaderboard automatically cleared.');
+}, 10 * 60 * 1000);
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
