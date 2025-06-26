@@ -172,6 +172,31 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
+// Debug routes
+app.get('/debug/ping', (req, res) => {
+    res.json({ message: 'pong', time: new Date().toISOString() });
+});
+
+app.get('/debug/env', (req, res) => {
+    res.json({
+        NODE_ENV: process.env.NODE_ENV,
+        PORT: process.env.PORT,
+    });
+});
+
+app.get('/debug/leaderboard', (req, res) => {
+    let fileData = null;
+    try {
+        fileData = fs.readFileSync(leaderboardFile, 'utf-8');
+    } catch (e) {
+        fileData = 'Could not read leaderboard file.';
+    }
+    res.json({
+        heap: leaderboard.heap,
+        file: fileData
+    });
+});
+
 // Start server
 const server = app.listen(port, '0.0.0.0', () => {
     console.log(`Server running on port ${port}`);
