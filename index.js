@@ -109,12 +109,6 @@ function saveLeaderboard() {
 
 loadLeaderboard();
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Global error handler:', err.stack);
-    res.status(500).json({ error: 'Something went wrong!' });
-});
-
 // Routes
 app.post('/add_score', (req, res) => {
     try {
@@ -174,6 +168,12 @@ app.get('/health', (req, res) => {
 // Start server
 const server = app.listen(port, '0.0.0.0', () => {
     console.log(`Server running on port ${port}`);
+});
+
+// Error handling middleware (moved here)
+app.use((err, req, res, next) => {
+    console.error('Global error handler:', err.stack);
+    res.status(500).json({ error: 'Something went wrong!' });
 });
 
 // Handle server errors
